@@ -1,4 +1,4 @@
-# ☀️ NLP-Solar-Vietnam
+# ☀️ NLP-LABS-Vietnam
 
 > **Từ định luật vật lý của Becquerel đến mái nhà Việt Nam** — Kết hợp thuật toán vật lý năng lượng mặt trời (pvlib) với sức mạnh Xử lý Ngôn ngữ Tự nhiên (NLP) để tạo ra hệ sinh thái điện mặt trời thông minh, dành riêng cho Việt Nam.
 
