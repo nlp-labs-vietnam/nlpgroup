@@ -7,7 +7,10 @@ Phương pháp: Rule-based + Regex (Phase 1), nâng cấp lên PhoBERT NER (Phas
 
 from __future__ import annotations
 import re
-from .text_to_solar import SolarQuery
+try:
+    from .text_to_solar import SolarQuery
+except ImportError:
+    from text_to_solar import SolarQuery  # type: ignore[no-redef]
 
 
 # ---------------------------------------------------------------------------
@@ -18,12 +21,12 @@ from .text_to_solar import SolarQuery
 _DIRECTION_MAP = {
     r"\bnam\b": "Nam",
     r"\bbắc\b": "Bắc",
-    r"\bđông\b(?!\s*nam|\s*bắc)": "Đông",
-    r"\btây\b(?!\s*nam|\s*bắc)": "Tây",
     r"\bđông[\s\-]?nam\b": "Đông Nam",
     r"\bđông[\s\-]?bắc\b": "Đông Bắc",
     r"\btây[\s\-]?nam\b": "Tây Nam",
     r"\btây[\s\-]?bắc\b": "Tây Bắc",
+    r"\bđông\b": "Đông",
+    r"\btây\b": "Tây",
 }
 
 # Số tiền (hỗ trợ: 1.5 triệu, 1,5tr, 1500000, 800k, ...)
@@ -102,7 +105,10 @@ class SolarNERExtractor:
     # ------------------------------------------------------------------
 
     def _extract_direction(self, text: str) -> str | None:
-        for pattern, label in _DIRECTION_MAP.items():
+        # Kiểm tra compound directions (đông nam, tây bắc, ...) trước khi kiểm tra đơn
+        compound_patterns = {k: v for k, v in _DIRECTION_MAP.items() if len(v) > 3}
+        simple_patterns = {k: v for k, v in _DIRECTION_MAP.items() if len(v) <= 3}
+        for pattern, label in {**compound_patterns, **simple_patterns}.items():
             if re.search(pattern, text, re.IGNORECASE | re.UNICODE):
                 return label
         return None
@@ -116,15 +122,23 @@ class SolarNERExtractor:
 
     def _extract_money_bill(self, text: str) -> float | None:
         """Trích xuất hóa đơn điện hàng tháng."""
-        # Tìm context "tiền điện ... X triệu/tháng"
         context_re = re.compile(
-            r"(?:tiền\s*điện|hóa\s*đơn|trả|tháng\s*trả|xài|dùng)\s*[:\-]?\s*"
-            r"(\d+(?:[.,]\d+)?)\s*(triệu|tr|nghìn|ngàn|k)?",
+            r"(?:tiền\s*điện|hóa\s*đơn|trả|tháng\s*trả|xài|dùng|tốn)\s*[:\-]?\s*"
+            r"(\d+(?:[.,]\d+)?)\s*(triệu|tỷ|tr|nghìn|ngàn|k)?",
             re.IGNORECASE | re.UNICODE,
         )
+        # Thử với "hóa đơn điện X đơn vị"
         m = context_re.search(text)
         if m:
             return self._parse_amount(m.group(1), m.group(2))
+        # Fallback: "X nghìn/triệu mỗi/một tháng" (đơn vị trước mỗi tháng)
+        fallback_re = re.compile(
+            r"(\d+(?:[.,]\d+)?)\s*(triệu|tỷ|tr|nghìn|ngàn|k)\s*(?:mỗi|một|\/|mỗi\s*tháng|\/tháng)",
+            re.IGNORECASE | re.UNICODE,
+        )
+        m2 = fallback_re.search(text)
+        if m2:
+            return self._parse_amount(m2.group(1), m2.group(2))
         return None
 
     def _extract_budget(self, text: str) -> float | None:

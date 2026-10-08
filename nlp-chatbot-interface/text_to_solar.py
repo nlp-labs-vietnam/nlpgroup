@@ -129,7 +129,10 @@ class TextToSolarEngine:
     _EMISSION_FACTOR_KG_CO2 = 0.572
 
     def __init__(self, use_pvlib: bool = True) -> None:
-        from .ner_extractor import SolarNERExtractor
+        try:
+            from .ner_extractor import SolarNERExtractor
+        except ImportError:
+            from ner_extractor import SolarNERExtractor  # type: ignore[no-redef]
         self.ner = SolarNERExtractor()
         self.use_pvlib = use_pvlib
 
